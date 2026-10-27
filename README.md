@@ -1,155 +1,114 @@
-# Metrum PQ Monitor | IEC 61000-4-30 (Sag & Swell)
+# Metrum PQ System | Monitor Multi-ESP32 (IEC 61000-4-30) & Servidor Python :3000
 
-Protótipo industrial de monitoramento de Qualidade de Energia focado na detecção em tempo real de distúrbios de tensão (**Afundamentos / Sag** e **Elevações / Swell**) em conformidade com as diretrizes da norma **IEC 61000-4-30** em redes de 60 Hz, utilizando o microcontrolador **ESP32** (FreeRTOS Dual-Core) e uma interface web interativa de alta performance.
+Sistema industrial distribuído de monitoramento de Qualidade de Energia focado na detecção em tempo real de **Afundamentos (Sag)** e **Elevações (Swell)** de tensão conforme a norma **IEC 61000-4-30** em redes de 60 Hz.
 
-Desenvolvido para o desafio técnico industrial **Metrum / HackatOhm**.
-
----
-
-## 1. Destaques da Arquitetura
-
-- **Multitarefa Dual-Core FreeRTOS Dedicada:**
-  - **Core 1 (DSP & Aquisição - Prioridade Máxima 24):** Amostragem contínua determinística a **64 amostras por ciclo** (3840 Hz no GPIO 34), eliminação dinâmica de offset DC, cálculo de *True RMS* ciclo a ciclo, normalização em por unidade ($pu = V_{RMS} / V_{ref}$) e máquina de estados com histerese.
-  - **Core 0 (Comunicação & Web - Prioridade Baixa 2):** Pilha Wi-Fi (SoftAP e STA), servidor assíncrono `ESPAsyncWebServer`, streaming WebSocket bidirecional a ~10 Hz, endpoints REST e histórico consolidado.
-- **Comunicação Inter-Core Segura (*Thread-Safe*):**
-  - Filas do FreeRTOS: `xQueueOverwrite` para telemetria fresca (não bloqueante) e `xQueueSend` para eventos consolidados.
-  - `xSemaphoreCreateMutex` para atualização de parâmetros em tempo de execução sem paradas de máquina.
-- **Interface Web Mobile-First & Offline-Ready:**
-  - Totalmente funcional no modo SoftAP (`192.168.4.1`) sem requisições a CDNs externas.
-  - Gráfico dinâmico do envelope de tensão via HTML5 Canvas com linhas de limiar tracejadas em 0.90 pu e 1.10 pu.
-  - Cards com indicação de estado e animações dinâmicas (Verde: Normal, Âmbar: Sag, Vermelho: Swell).
-  - Tabela com histórico consolidado e botão de **Exportação CSV** formatado com BOM UTF-8 (compatível com Microsoft Excel).
-  - Bancada didática de testes com injeção de distúrbios virtuais para demonstração instantânea em bancada.
-  - Alvos de toque ergonômicos ($\ge 44 \times 44\text{ px}$) e layout 100% testado em telas compactas (a partir de 320 px de largura).
+O sistema é desacoplado em duas camadas:
+1. **Sondas IoT ESP32 (Edge DSP):** Microcontroladores executando amostragem contínua a **64 amostras/ciclo (3840 Hz)** no Core 1 e atuando como clientes WebSocket no Core 0.
+2. **Servidor Central Python (Porta 3000):** Backend assíncrono em FastAPI capaz de receber fluxos de múltiplos ESP32s simultâneos, gerenciar histórico consolidado e fornecer um dashboard web interativo em tempo real.
 
 ---
 
-## 2. Pinout e Circuito de Condicionamento Analógico
+## 1. Visão Geral da Arquitetura Desacoplada
 
-| Função | Pino ESP32 | Descrição |
+```
+  ┌───────────────────────┐            ┌───────────────────────┐
+  │  ESP32 Sonda 01       │            │  ESP32 Sonda 02       │
+  │  (Subestação Norte)   │            │  (Transformador 02)   │
+  └──────────┬────────────┘            └──────────┬────────────┘
+             │                                    │
+             │ ws://<SERVER_IP>:3000/ws/device    │
+             └─────────────────┬──────────────────┘
+                               ▼
+               ┌──────────────────────────────┐
+               │    SERVIDOR CENTRAL PYTHON   │
+               │        (FastAPI :3000)       │
+               └───────────────┬──────────────┘
+                               │ WebSocket /ws/ui & HTTP
+                               ▼
+               ┌──────────────────────────────┐
+               │   DASHBOARD WEB INDUSTRIAL   │
+               │   - Seletor de Sondas        │
+               │   - Envelope Gráfico Canvas  │
+               │   - Histórico & Export CSV   │
+               └──────────────────────────────┘
+```
+
+---
+
+## 2. Como Executar o Servidor Central Python
+
+### 2.1 Pré-requisitos
+- Python 3.9+ instalado.
+- Instale as dependências:
+  ```bash
+  pip install -r server/requirements.txt
+  ```
+
+### 2.2 Inicialização do Servidor
+No diretório raiz do projeto, execute:
+```bash
+python server/app.py
+```
+O servidor inicializará escutando em **todas as interfaces de rede na porta 3000**:
+- **Dashboard Web:** `http://localhost:3000` (ou `http://<IP_DA_MAQUINA>:3000`)
+- **Endpoint de Sondas ESP32:** `ws://<IP_DA_MAQUINA>:3000/ws/device?device_id=<ID_DA_SONDA>`
+
+### 2.3 Simulação de Sondas Virtuais (Sem Hardware)
+Para demonstrar o sistema multi-sonda imediatamente no laboratório ou banca avaliadora:
+- Abra uma nova janela de terminal e execute:
+  ```bash
+  python server/simulator.py --device ESP32-SUBESTACAO-01
+  ```
+- Para adicionar um segundo nó simultâneo:
+  ```bash
+  python server/simulator.py --device ESP32-TRAFO-02 --vref 220.0
+  ```
+O painel em `http://localhost:3000` reconhecerá instantaneamente as sondas e permitirá alternar a visualização pelo seletor no topo da página.
+
+---
+
+## 3. Configuração e Gravação da Sonda ESP32
+
+### 3.1 Configuração dos Parâmetros no Firmware
+No arquivo [`src/main.cpp`](file:///c:/Users/ggoes/Documents/antigravity/fervent-archimedes/src/main.cpp), ajuste as variáveis de rede e alvo:
+
+```cpp
+#define WIFI_SSID     "Nome_Do_Seu_Roteador"
+#define WIFI_PASSWORD "Senha_Do_Seu_Roteador"
+
+// IP da máquina onde o server/app.py está rodando
+#define SERVER_HOST   "192.168.1.100" 
+#define SERVER_PORT   3000
+
+// Identificador único da sonda instalada
+#define DEVICE_ID     "ESP32-SUBESTACAO-01"
+```
+
+### 3.2 Compilação e Gravação com PlatformIO
+Conecte a placa ESP32 via USB e execute:
+```bash
+pio run --target upload
+pio device monitor -b 115200
+```
+Ao inicializar, a tarefa no Core 0 conectará ao Wi-Fi e abrirá o canal WebSocket com o servidor central Python na porta 3000.
+
+---
+
+## 4. Roteiro de Teste dos 3 Cenários Obrigatórios
+
+Com o servidor rodando e ao menos uma sonda (física ou virtual) conectada:
+
+| Cenário | Procedimento no Painel Web | Resposta Esperada |
 |---|---|---|
-| **Sinal Analógico CA** | **GPIO 34 (ADC1_CH6)** | Entrada exclusiva de conversão analógica (não interfere com Wi-Fi) |
-| **GND** | **GND** | Referência comum do sistema |
-| **Alimentação** | **VIN / 5V** ou **3V3** | Alimentação do módulo sensor (ZMPT101B ou divisor ativo) |
-
-### Esquema Típico de Condicionamento:
-```
- Rede CA (127V / 220V) 
-        │
-   ┌────┴────┐
-   │ Sensor  │ (ex: Módulo ZMPT101B com trimpot de calibração)
-   │ZMPT101B │ ou Divisor Resistivo + Offset DC de 1.65V
-   └────┬────┘
-        ├─── Saída Analógica (Sinal centrado em 1.65V, pico a pico < 3.0V)
-        │
-        └───> GPIO 34 do ESP32 (ADC1 Channel 6)
-```
+| **1. Nominal (1.00 pu)** | Selecione a sonda e clique no botão **"Nominal (1.00 pu)"**. | RMS estabiliza em $127.0\text{ V} \pm 0.5\text{ V}$ ($1.000\text{ pu}$). Card exibe **NORMAL** verde e o gráfico segue a linha verde central. |
+| **2. Afundamento (Sag)** | Clique no botão **"Afundamento (Sag 0.75 pu)"** (pulso de 400 ms). | Card muda para **AFUNDAMENTO (SAG)** âmbar pulsante. O envelope cai abaixo de 0.90 pu. Ao cruzar 0.92 pu (histerese), o evento é injetado na tabela: `SAG`, `~400 ms`, `~24 ciclos`, `~95.3 V`, `0.750 pu`. |
+| **3. Elevação (Swell)** | Clique no botão **"Elevação (Swell 1.25 pu)"** (pulso de 400 ms). | Card muda para **ELEVAÇÃO (SWELL)** vermelho. O envelope ultrapassa 1.10 pu. Ao retornar abaixo de 1.08 pu (histerese), o evento é gravado: `SWELL`, `~400 ms`, `~24 ciclos`, `~158.8 V`, `1.250 pu`. |
 
 ---
 
-## 3. Estrutura do Projeto
+## 5. Exportação de Relatórios e Ajustes Dinâmicos
 
-```
-fervent-archimedes/
-├── platformio.ini              # Configurações de build do PlatformIO
-├── include/
-│   ├── types.h                 # Estruturas de dados (TelemetryData, PowerQualityEvent)
-│   ├── dsp_engine.h            # Declaração do motor de amostragem e máquina de estados
-│   ├── web_server.h            # Declaração do servidor HTTP, WebSocket e REST
-│   └── html_content.h          # Fallback da interface web em PROGMEM Flash
-├── src/
-│   ├── main.cpp                # Ponto de entrada, alocação de tarefas nos núcleos do ESP32
-│   ├── dsp_engine.cpp          # Implementação de amostragem a 3840 Hz e IEC 61000-4-30
-│   └── web_server.cpp          # Handlers WebSocket e rotas REST API
-├── data/
-│   └── index.html              # Dashboard Web responsivo (HTML5 + CSS + Canvas)
-└── docs/
-    └── architecture.md         # Documentação de engenharia detalhada
-```
-
----
-
-## 4. Instruções de Compilação e Gravação
-
-### Opção A: Utilizando PlatformIO (Recomendado)
-1. Instale o **VS Code** com a extensão **PlatformIO IDE**.
-2. Abra a pasta do projeto no VS Code.
-3. Conecte o ESP32 à porta USB do computador.
-4. Execute o build e upload:
-   ```bash
-   # Compilar e gravar o firmware no ESP32
-   pio run --target upload
-
-   # (Opcional) Gravar a pasta data/ no LittleFS
-   pio run --target uploadfs
-
-   # Abrir o monitor serial (115200 bps)
-   pio device monitor
-   ```
-
-> **Nota:** Se você não executar o comando `uploadfs`, o firmware ativará automaticamente a página web de contingência embutida na memória Flash (`PROGMEM`), funcionando 100% de primeira!
-
-### Opção B: Utilizando Arduino IDE (v2.x)
-1. Abra a IDE do Arduino e selecione a placa **ESP32 Dev Module**.
-2. No gerenciador de bibliotecas da IDE, instale:
-   - `ArduinoJson` (v7.x por Benoît Blanchon)
-   - `ESPAsyncWebServer` (por mathieucarbou / me-no-dev)
-   - `AsyncTCP` (por mathieucarbou)
-3. Abra o arquivo `src/main.cpp` (ou renomeie `main.cpp` para uma pasta de mesmo nome `.ino`).
-4. Conecte o ESP32 e clique em **Carregar**.
-
----
-
-## 5. Como Testar os 3 Cenários Obrigatórios
-
-Após gravar o firmware, conecte seu notebook ou smartphone à rede Wi-Fi gerada pelo ESP32:
-- **Rede Wi-Fi (SSID):** `ESP32-PowerQuality`
-- **Senha:** `metrum123`
-- **Endereço do Painel:** Acesse no navegador `http://192.168.4.1`
-
-*(Se configurado em modo STA, o ESP32 exibirá o endereço IP obtido via DHCP no Monitor Serial).*
-
-### Teste 1: Regime Permanente Nominal (1.00 pu)
-- **Ação:** Clique no botão verde **"Nominal (1.00 pu)"** no painel *Bancada de Testes de Distúrbios*.
-- **Comportamento Esperado:**
-  - O mostrador RMS estabiliza em **~127.0 V** ($\pm 0.5\text{ V}$).
-  - A tensão por unidade indica **1.000 pu** (Desvio: 0.0%).
-  - O Card de Estado exibe **NORMAL** com contorno verde e texto *"Operação em Regime Permanente"*.
-  - O traço do gráfico repousa na linha central tracejada verde (1.00 pu).
-
-### Teste 2: Afundamento de Tensão / Sag ($\le 0.90\text{ pu}$)
-- **Ação:** Clique no botão âmbar **"Afundamento (Sag 0.75 pu)"**.
-- **Comportamento Esperado:**
-  - A tensão cai imediatamente para **~95.3 V** (0.75 pu).
-  - O Card de Estado muda dinamicamente para cor âmbar pulsante com o título **AFUNDAMENTO (SAG)**.
-  - O envelope cai abaixo da linha de limiar tracejada âmbar em 0.90 pu.
-  - Após 400 ms (tempo do pulso simulado), a tensão se recupera para 1.00 pu. Ao cruzar **0.92 pu** (limiar de 0.90 pu + histerese de 0.02 pu), o evento é finalizado.
-  - Uma nova linha é inserida instantaneamente na **Tabela de Histórico de Eventos** indicando:
-    - Classe: `SAG`
-    - Duração: `~400 ms` (~24 ciclos de 60 Hz)
-    - Tensão Extrema: `~95.3 V`
-    - Relação: `0.750 pu`
-
-### Teste 3: Elevação de Tensão / Swell ($\ge 1.10\text{ pu}$)
-- **Ação:** Clique no botão vermelho **"Elevação (Swell 1.25 pu)"**.
-- **Comportamento Esperado:**
-  - A tensão sobe imediatamente para **~158.8 V** (1.25 pu).
-  - O Card de Estado comuta para cor vermelha com o título **ELEVAÇÃO (SWELL)**.
-  - O traço do gráfico ultrapassa a linha tracejada vermelha superior (1.10 pu).
-  - Após 400 ms, a tensão retorna a 1.00 pu. Ao atingir **1.08 pu** (limiar de 1.10 pu - histerese de 0.02 pu), o evento de Swell é consolidado e registrado na tabela.
-
-### Teste com Sinal Real via Hardware (Gerador de Sinais / Variac)
-- Clique no botão **"Modo Real (ADC GPIO 34)"**.
-- O sistema comuta para leitura contínua do pino GPIO 34 a 3840 Hz.
-- Ao variar a amplitude no gerador de funções ou variac, observe o detector IEC 61000-4-30 registrar os eventos físicos reais com precisão de ciclos.
-
----
-
-## 6. Exportação de Relatórios e Configurações Dinâmicas
-
-1. **Exportação CSV:**
-   - Clique em **"Exportar CSV"** na tabela de histórico.
-   - O arquivo `pq_events_iec61000_AAAA-MM-DD.csv` é gerado contendo cabeçalho estruturado e codificação UTF-8 BOM para abertura nativa no Excel ou importação em sistemas SCADA / Power BI.
-2. **Ajuste de Parâmetros sem Regravar o ESP32:**
-   - No painel inferior, altere $V_{ref}$ para 220V ou modifique os limiares de Sag (ex: 0.85 pu) e Swell (ex: 1.15 pu).
-   - Clique em **"Salvar Parâmetros no ESP32"**. A chamada `POST /api/config` atualiza os limiares no microcontrolador via mutex em menos de 5 milissegundos.
+1. **Exportar CSV:**
+   - Clique em **"Exportar CSV"** na tabela de histórico. O relatório padronizado RFC 4180 com codificação UTF-8 BOM será baixado com todas as ocorrências de todas as sondas.
+2. **Ajuste de Parâmetros Remoto:**
+   - No rodapé do painel, modifique os limiares e clique em **"Salvar Parâmetros no ESP32"**. O servidor envia uma mensagem de comando via WebSocket para o microcontrolador selecionado, aplicando os novos limiares sem reiniciar a máquina.
