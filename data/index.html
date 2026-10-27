@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <title>Metrum PQ | Monitor IEC 61000-4-30 (Sag & Swell)</title>
+  <style>
+    /* Reset & Variáveis Industriais - Paleta Dark Cyberpunk/Industrial */
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --card-hover: #1a2336;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.25);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.25);
+      --accent: #6366f1;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Mobile-first Layout Container */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0.75rem;
+      flex: 1;
+    }
+    @media (min-width: 640px) {
+      .container { padding: 1.25rem; }
+    }
+    @media (min-width: 1024px) {
+      .container { padding: 1.75rem; }
+    }
+
+    /* Top Bar & Header */
+    header {
+      background-color: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .header-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0.85rem 0.75rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    @media (min-width: 640px) {
+      .header-content {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.85rem 1.25rem;
+      }
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .logo-badge {
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.2rem;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+      flex-shrink: 0;
+    }
+    .brand-text h1 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .brand-text p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(31, 41, 61, 0.7);
+      border: 1px solid var(--card-border);
+      min-height: 32px;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+    .badge-dot.connected {
+      background-color: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+    .badge-dot.disconnected {
+      background-color: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Grid Responsivo para Métricas Principais (Cards) */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+    @media (min-width: 480px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1024px) {
+      .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1rem;
+      position: relative;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .card-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+    .card-unit {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: 0.25rem;
+    }
+    .card-subtext {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Cores Dinâmicas de Estado */
+    .status-card.state-normal {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, var(--card-bg) 100%);
+    }
+    .status-card.state-normal .status-indicator {
+      color: var(--success);
+    }
+    .status-card.state-sag {
+      border-color: rgba(245, 158, 11, 0.7);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, var(--card-bg) 100%);
+      box-shadow: 0 0 16px var(--warning-glow);
+      animation: alertPulse 1.2s infinite alternate;
+    }
+    .status-card.state-sag .status-indicator {
+      color: var(--warning);
+    }
+    .status-card.state-swell {
+      border-color: rgba(239, 68, 68, 0.8);
+      background: linear-gradient(180deg, rgba(239, 68, 68, 0.18) 0%, var(--card-bg) 100%);
+      box-shadow: 0 0 20px var(--danger-glow);
+      animation: alertPulse 0.9s infinite alternate;
+    }
+    .status-card.state-swell .status-indicator {
+      color: var(--danger);
+    }
+    @keyframes alertPulse {
+      from { border-color: rgba(245, 158, 11, 0.4); }
+      to { border-color: rgba(245, 158, 11, 1); }
+    }
+
+    /* Gráfico em Tempo Real */
+    .chart-section {
+      margin-top: 1.25rem;
+    }
+    .chart-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .chart-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    @media (min-width: 640px) {
+      .chart-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .legend-line {
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+    }
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 220px;
+    }
+    @media (min-width: 768px) {
+      .canvas-wrap { height: 280px; }
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      border-radius: 6px;
+    }
+
+    /* Painel de Testes & Simulação */
+    .test-bench {
+      margin-top: 1.25rem;
+      background: linear-gradient(180deg, #161e2e 0%, var(--card-bg) 100%);
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.1rem;
+    }
+    .bench-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .bench-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.85rem;
+    }
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.6rem;
+    }
+    @media (min-width: 480px) {
+      .button-group { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 768px) {
+      .button-group { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    /* Botões Padrão Touch-Friendly (min 44x44px) */
+    .btn {
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0.7rem 1rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn-nominal {
+      background-color: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    .btn-nominal:hover { background-color: rgba(16, 185, 129, 0.25); }
+    .btn-sag {
+      background-color: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+    .btn-sag:hover { background-color: rgba(245, 158, 11, 0.25); }
+    .btn-swell {
+      background-color: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+    .btn-swell:hover { background-color: rgba(239, 68, 68, 0.25); }
+    .btn-hardware {
+      background-color: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+    .btn-hardware:hover { background-color: rgba(56, 189, 248, 0.25); }
+    .btn-secondary {
+      background-color: #1f2937;
+      border-color: var(--card-border);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover { background-color: #374151; }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+    }
+    .btn-primary:hover { opacity: 0.95; }
+
+    /* Seção da Tabela de Eventos */
+    .history-section {
+      margin-top: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .history-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .history-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 640px) {
+      .history-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+    .history-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.8rem;
+      min-width: 600px;
+    }
+    th {
+      background-color: #0f172a;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 0.75rem 0.85rem;
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 0.75rem 0.85rem;
+      border-bottom: 1px solid rgba(31, 41, 61, 0.6);
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background-color: rgba(255, 255, 255, 0.02); }
+    .badge-event {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.7rem;
+      letter-spacing: 0.03em;
+    }
+    .badge-sag {
+      background-color: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .badge-swell {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    /* Modal / Painel de Configurações */
+    .config-panel {
+      margin-top: 1.25rem;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.1rem;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+      margin-top: 0.85rem;
+    }
+    @media (min-width: 640px) {
+      .form-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1024px) {
+      .form-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .form-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .form-input {
+      min-height: 44px;
+      padding: 0.6rem 0.85rem;
+      background-color: #0b0f19;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      background-color: #1f2937;
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      transform: translateY(150%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+    .toast.show { transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Cabeçalho Sticky -->
+  <header>
+    <div class="header-content">
+      <div class="brand">
+        <div class="logo-badge" title="HackatOhm / Metrum PQ Monitor">PQ</div>
+        <div class="brand-text">
+          <h1>Monitor de Qualidade de Energia</h1>
+          <p>IEC 61000-4-30 • DSP Dual-Core ESP32 (60 Hz)</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="badge" id="sourceBadge">
+          <span style="color:var(--primary);">●</span> Fonte: <strong id="sourceText">ADC (GPIO 34)</strong>
+        </span>
+        <span class="badge">
+          <span class="badge-dot disconnected" id="wsDot"></span>
+          <span id="wsStatusText">Conectando...</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    
+    <!-- Grid de Métricas Principais -->
+    <section class="metrics-grid">
+      <!-- Card V_RMS -->
+      <div class="card">
+        <div class="card-title">
+          <span>Tensão RMS</span>
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <div class="card-value">
+          <span id="vRmsValue">---.-</span><span class="card-unit">V</span>
+        </div>
+        <div class="card-subtext">
+          Ref: <span id="vRefSubtext">127.0</span> V
+        </div>
+      </div>
+
+      <!-- Card pu -->
+      <div class="card">
+        <div class="card-title">
+          <span>Normalizada (pu)</span>
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <div class="card-value">
+          <span id="puValue">-.---</span><span class="card-unit">pu</span>
+        </div>
+        <div class="card-subtext" id="puDeltaText">
+          Nominal: 1.000 pu
+        </div>
+      </div>
+
+      <!-- Card Classificação de Estado -->
+      <div class="card status-card state-normal" id="statusCard">
+        <div class="card-title">
+          <span>Estado da Rede</span>
+          <span class="status-indicator" id="statusPulse">●</span>
+        </div>
+        <div class="card-value" style="font-size:1.4rem;" id="stateTitle">
+          NORMAL
+        </div>
+        <div class="card-subtext" id="stateSubtext">
+          Operação em Regime Permanente
+        </div>
+      </div>
+
+      <!-- Card Frequência e Ciclos -->
+      <div class="card">
+        <div class="card-title">
+          <span>Frequência / Ciclos</span>
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="card-value">
+          <span id="freqValue">60.0</span><span class="card-unit">Hz</span>
+        </div>
+        <div class="card-subtext">
+          Ciclo: <span id="cycleCounter">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gráfico do Envelope de Tensão em Tempo Real -->
+    <section class="chart-section">
+      <div class="chart-container">
+        <div class="chart-header">
+          <div>
+            <h2 class="chart-title">Envelope de Tensão em Tempo Real (RMS pu)</h2>
+            <p style="font-size:0.75rem; color:var(--text-muted);">Amostragem: 64 amostras/ciclo (3840 Hz) no Core 1 • Stream: ~10 Hz</p>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-line" style="background:#ef4444; border-top:2px dashed #ef4444;"></span> Swell (≥ 1.10 pu)</span>
+            <span class="legend-item"><span class="legend-line" style="background:#10b981;"></span> Nominal (1.00 pu)</span>
+            <span class="legend-item"><span class="legend-line" style="background:#f59e0b; border-top:2px dashed #f59e0b;"></span> Sag (≤ 0.90 pu)</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="scopeCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Painel de Injeção de Cenários (Bancada Didática / Demonstração) -->
+    <section class="test-bench">
+      <div class="bench-title">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+        <span>Bancada de Testes de Distúrbios (Injeção em Tempo Real)</span>
+      </div>
+      <p class="bench-desc">Gere distúrbios controlados pelo sintetizador do Core 1 ou retorne à leitura real do ADC (GPIO 34):</p>
+      <div class="button-group">
+        <button class="btn btn-nominal" onclick="triggerScenario('nominal', 1.0, 0)">
+          <span>✔</span> Nominal (1.00 pu)
+        </button>
+        <button class="btn btn-sag" onclick="triggerScenario('sag', 0.75, 400)">
+          <span>▼</span> Afundamento (Sag 0.75 pu)
+        </button>
+        <button class="btn btn-swell" onclick="triggerScenario('swell', 1.25, 400)">
+          <span>▲</span> Elevação (Swell 1.25 pu)
+        </button>
+        <button class="btn btn-hardware" onclick="triggerScenario('adc', 1.0, 0)">
+          <span>⚡</span> Modo Real (ADC GPIO 34)
+        </button>
+      </div>
+    </section>
+
+    <!-- Histórico Consolidado de Eventos -->
+    <section class="history-section">
+      <div class="history-card">
+        <div class="history-header">
+          <div>
+            <h2 style="font-size:1rem; font-weight:700;">Histórico de Eventos IEC 61000-4-30</h2>
+            <p style="font-size:0.75rem; color:var(--text-muted);">Eventos consolidados com rastreamento de valor extremo e histerese</p>
+          </div>
+          <div class="history-actions">
+            <button class="btn btn-primary" onclick="exportToCSV()" title="Baixar CSV para Excel/BI">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Exportar CSV</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearEventHistory()" title="Limpar Tabela">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <span>Limpar</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="eventsTable">
+            <thead>
+              <tr>
+                <th># ID</th>
+                <th>Classe</th>
+                <th>Horário</th>
+                <th>Duração (ms)</th>
+                <th>Duração (ciclos)</th>
+                <th>Tensão Extrema</th>
+                <th>Relação (pu)</th>
+              </tr>
+            </thead>
+            <tbody id="eventsTableBody">
+              <tr id="emptyTableRow">
+                <td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-muted);">
+                  Nenhum evento registrado até o momento. Inicie um teste acima ou conecte uma fonte CA.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Painel de Configurações REST API -->
+    <section class="config-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="font-size:0.95rem; font-weight:700;">Parâmetros Operacionais (REST API)</h2>
+          <p style="font-size:0.75rem; color:var(--text-muted);">Ajuste limiares e parâmetros de calibração dinamicamente sem regravar o firmware</p>
+        </div>
+      </div>
+      <form id="configForm" onsubmit="saveConfiguration(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Tensão Ref (V)</label>
+            <input type="number" step="0.1" class="form-input" id="cfgVref" value="127.0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Limiar Sag (pu)</label>
+            <input type="number" step="0.01" class="form-input" id="cfgSag" value="0.90" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Limiar Swell (pu)</label>
+            <input type="number" step="0.01" class="form-input" id="cfgSwell" value="1.10" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Histerese (pu)</label>
+            <input type="number" step="0.005" class="form-input" id="cfgHyst" value="0.02" required>
+          </div>
+        </div>
+        <div style="margin-top:0.85rem; display:flex; justify-content:flex-end;">
+          <button type="submit" class="btn btn-primary">
+            <span>Salvar Parâmetros no ESP32</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+
+  <div class="toast" id="toast">
+    <span id="toastIcon">✔</span>
+    <span id="toastMsg">Configurações atualizadas!</span>
+  </div>
+
+  <script>
+    // Gerenciador de WebSocket e Estado do Cliente
+    let ws = null;
+    let reconnectInterval = 2000;
+    const recordedEvents = [];
+    let currentVRef = 127.0;
+    let sagLimit = 0.90;
+    let swellLimit = 1.10;
+
+    // Buffer de Pontos do Osciloscópio Envelope (120 amostras ~ 12 segundos)
+    const MAX_POINTS = 120;
+    const chartBuffer = new Array(MAX_POINTS).fill(1.0);
+
+    // Inicialização da Aplicação
+    window.addEventListener('DOMContentLoaded', () => {
+      initCanvas();
+      fetchConfig();
+      fetchEvents();
+      connectWebSocket();
+      window.addEventListener('resize', resizeCanvas);
+    });
+
+    // Conexão WebSocket com Reconexão Automática
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      const wsDot = document.getElementById('wsDot');
+      const wsStatusText = document.getElementById('wsStatusText');
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        wsDot.className = 'badge-dot connected';
+        wsStatusText.textContent = 'Conectado';
+      };
+
+      ws.onclose = () => {
+        wsDot.className = 'badge-dot disconnected';
+        wsStatusText.textContent = 'Desconectado';
+        setTimeout(connectWebSocket, reconnectInterval);
+      };
+
+      ws.onerror = (err) => {
+        ws.close();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'telemetry') {
+            handleTelemetry(msg);
+          } else if (msg.type === 'event') {
+            handleNewEvent(msg);
+          }
+        } catch (e) {
+          console.error('Falha ao decodificar JSON do WebSocket:', e);
+        }
+      };
+    }
+
+    // Processamento do Stream de Telemetria (~10 Hz)
+    function handleTelemetry(t) {
+      document.getElementById('vRmsValue').textContent = t.v_rms.toFixed(1);
+      document.getElementById('puValue').textContent = t.pu.toFixed(3);
+      document.getElementById('freqValue').textContent = t.freq.toFixed(1);
+      document.getElementById('cycleCounter').textContent = t.cycle.toLocaleString();
+
+      const delta = ((t.pu - 1.0) * 100).toFixed(1);
+      const sign = delta >= 0 ? '+' : '';
+      document.getElementById('puDeltaText').textContent = `Desvio: ${sign}${delta}%`;
+
+      // Atualiza Card de Estado
+      const card = document.getElementById('statusCard');
+      const title = document.getElementById('stateTitle');
+      const sub = document.getElementById('stateSubtext');
+
+      if (t.state === 1 || t.state === 'SAG') {
+        card.className = 'card status-card state-sag';
+        title.textContent = 'AFUNDAMENTO (SAG)';
+        sub.textContent = `Duração: ${t.active_dur || 0} ms | Mín: ${(t.active_extreme || t.pu).toFixed(3)} pu`;
+      } else if (t.state === 2 || t.state === 'SWELL') {
+        card.className = 'card status-card state-swell';
+        title.textContent = 'ELEVAÇÃO (SWELL)';
+        sub.textContent = `Duração: ${t.active_dur || 0} ms | Máx: ${(t.active_extreme || t.pu).toFixed(3)} pu`;
+      } else {
+        card.className = 'card status-card state-normal';
+        title.textContent = 'NORMAL';
+        sub.textContent = 'Operação em Regime Permanente';
+      }
+
+      // Adiciona ponto ao buffer do gráfico
+      chartBuffer.push(t.pu);
+      if (chartBuffer.length > MAX_POINTS) {
+        chartBuffer.shift();
+      }
+      drawScope();
+    }
+
+    // Injeção de Evento Consolidado na Tabela
+    function handleNewEvent(evt) {
+      recordedEvents.unshift(evt);
+      renderTable();
+      showToast(`Evento ${evt.class} #${evt.id} registrado (${evt.duration_ms} ms, ${evt.extreme_pu.toFixed(3)} pu)`);
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('eventsTableBody');
+      if (recordedEvents.length === 0) {
+        tbody.innerHTML = `
+          <tr id="emptyTableRow">
+            <td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-muted);">
+              Nenhum evento registrado até o momento.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = recordedEvents.map(e => {
+        const isSag = e.class === 'SAG' || e.type === 1;
+        const badgeClass = isSag ? 'badge-sag' : 'badge-swell';
+        const label = isSag ? 'SAG (Afundamento)' : 'SWELL (Elevação)';
+        
+        // Formatação de Horário amigável
+        let timeStr = '';
+        if (e.timestamp) {
+          const d = new Date(e.timestamp);
+          timeStr = isNaN(d.getTime()) ? `${e.timestamp} ms` : d.toLocaleTimeString() + '.' + String(d.getMilliseconds()).padStart(3, '0');
+        } else {
+          timeStr = `${e.timestamp_ms || 0} ms`;
+        }
+
+        return `
+          <tr>
+            <td><strong>#${e.id}</strong></td>
+            <td><span class="badge-event ${badgeClass}">${label}</span></td>
+            <td>${timeStr}</td>
+            <td><strong>${e.duration_ms}</strong> ms</td>
+            <td>${e.duration_cycles || e.cycles || Math.round(e.duration_ms / 16.666)} ciclos</td>
+            <td>${(e.extreme_voltage || e.extreme_v).toFixed(1)} V</td>
+            <td><strong>${(e.extreme_pu).toFixed(3)} pu</strong></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Renderização do Canvas (Gráfico de Envelope em Tempo Real)
+    const canvas = document.getElementById('scopeCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function initCanvas() {
+      resizeCanvas();
+      drawScope();
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+      drawScope();
+    }
+
+    function drawScope() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid de Fundo e Faixas de Escala
+      const yMin = 0.4;
+      const yMax = 1.6;
+      const yToPx = (val) => h - ((val - yMin) / (yMax - yMin)) * h;
+
+      // Linhas de Grade
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      [0.6, 0.8, 1.0, 1.2, 1.4].forEach(val => {
+        const y = yToPx(val);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.fillText(val.toFixed(2) + ' pu', 8, y - 4);
+      });
+
+      // Linha Limiar Swell (≥ 1.10 pu - Vermelha Tracejada)
+      const ySwell = yToPx(swellLimit);
+      ctx.save();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, ySwell);
+      ctx.lineTo(w, ySwell);
+      ctx.stroke();
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`Limiar Swell (${swellLimit.toFixed(2)} pu)`, w - 160, ySwell - 6);
+      ctx.restore();
+
+      // Linha Nominal (1.00 pu - Verde Suave)
+      const yNom = yToPx(1.0);
+      ctx.save();
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, yNom);
+      ctx.lineTo(w, yNom);
+      ctx.stroke();
+      ctx.restore();
+
+      // Linha Limiar Sag (≤ 0.90 pu - Âmbar Tracejada)
+      const ySag = yToPx(sagLimit);
+      ctx.save();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, ySag);
+      ctx.lineTo(w, ySag);
+      ctx.stroke();
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`Limiar Sag (${sagLimit.toFixed(2)} pu)`, w - 150, ySag + 14);
+      ctx.restore();
+
+      // Desenho do Traço da Onda Envelope
+      const stepX = w / (MAX_POINTS - 1);
+      ctx.beginPath();
+
+      for (let i = 0; i < chartBuffer.length; i++) {
+        const x = i * stepX;
+        const val = Math.max(yMin, Math.min(yMax, chartBuffer[i]));
+        const y = yToPx(val);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Ponto atual mais recente na extremidade direita
+      const lastVal = chartBuffer[chartBuffer.length - 1];
+      const lastX = (chartBuffer.length - 1) * stepX;
+      const lastY = yToPx(lastVal);
+      
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = lastVal <= sagLimit ? '#f59e0b' : (lastVal >= swellLimit ? '#ef4444' : '#38bdf8');
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Injeção de Cenários Didáticos (REST API)
+    function triggerScenario(type, pu, duration) {
+      const sourceText = document.getElementById('sourceText');
+      if (type === 'adc') {
+        sourceText.textContent = 'ADC Real (GPIO 34)';
+      } else {
+        sourceText.textContent = `Sintetizador (${type.toUpperCase()})`;
+      }
+
+      fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: type, pu: pu, duration_ms: duration })
+      })
+      .then(res => res.json())
+      .then(data => {
+        showToast(`Cenário '${type.toUpperCase()}' acionado.`);
+      })
+      .catch(err => {
+        console.warn('Simulação local de interface:', err);
+        showToast(`Cenário '${type.toUpperCase()}' aplicado localmente.`);
+      });
+    }
+
+    // Exportação em CSV conforme RFC 4180 com BOM para Excel
+    function exportToCSV() {
+      if (recordedEvents.length === 0) {
+        showToast('Nenhum evento para exportar.');
+        return;
+      }
+
+      let csv = '\uFEFF'; // BOM UTF-8
+      csv += 'ID;Classe;Timestamp_ms;Duracao_ms;Duracao_Ciclos_60Hz;Tensao_Extrema_V;Relacao_pu\r\n';
+
+      recordedEvents.forEach(e => {
+        const cls = e.class || (e.type === 1 ? 'SAG' : 'SWELL');
+        const ts = e.timestamp_ms || e.timestamp || 0;
+        const durMs = e.duration_ms || 0;
+        const cycles = e.duration_cycles || e.cycles || Math.round(durMs / 16.666);
+        const vExt = (e.extreme_voltage || e.extreme_v || 0).toFixed(2);
+        const puExt = (e.extreme_pu || 0).toFixed(4);
+
+        csv += `${e.id};${cls};${ts};${durMs};${cycles};${vExt};${puExt}\r\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `pq_events_iec61000_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Relatório CSV exportado com sucesso!');
+    }
+
+    function clearEventHistory() {
+      recordedEvents.length = 0;
+      renderTable();
+      fetch('/api/events/clear', { method: 'POST' }).catch(() => {});
+      showToast('Histórico de eventos limpo.');
+    }
+
+    // Operações REST de Configuração
+    function fetchConfig() {
+      fetch('/api/config')
+        .then(res => res.json())
+        .then(cfg => {
+          document.getElementById('cfgVref').value = cfg.v_ref;
+          document.getElementById('cfgSag').value = cfg.sag_threshold;
+          document.getElementById('cfgSwell').value = cfg.swell_threshold;
+          document.getElementById('cfgHyst').value = cfg.hysteresis;
+
+          currentVRef = cfg.v_ref;
+          sagLimit = cfg.sag_threshold;
+          swellLimit = cfg.swell_threshold;
+          document.getElementById('vRefSubtext').textContent = currentVRef.toFixed(1);
+          drawScope();
+        })
+        .catch(() => {});
+    }
+
+    function fetchEvents() {
+      fetch('/api/events')
+        .then(res => res.json())
+        .then(events => {
+          if (Array.isArray(events) && events.length > 0) {
+            recordedEvents.push(...events);
+            renderTable();
+          }
+        })
+        .catch(() => {});
+    }
+
+    function saveConfiguration(event) {
+      event.preventDefault();
+      const payload = {
+        v_ref: parseFloat(document.getElementById('cfgVref').value),
+        sag_threshold: parseFloat(document.getElementById('cfgSag').value),
+        swell_threshold: parseFloat(document.getElementById('cfgSwell').value),
+        hysteresis: parseFloat(document.getElementById('cfgHyst').value)
+      };
+
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        currentVRef = payload.v_ref;
+        sagLimit = payload.sag_threshold;
+        swellLimit = payload.swell_threshold;
+        document.getElementById('vRefSubtext').textContent = currentVRef.toFixed(1);
+        drawScope();
+        showToast('Parâmetros salvos com sucesso no ESP32!');
+      })
+      .catch(err => {
+        showToast('Falha ao comunicar com a API do ESP32.');
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
